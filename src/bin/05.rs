@@ -1,7 +1,6 @@
-use iset::IntervalMap;
 use nom::{
     bytes::complete::tag,
-    character::complete::{self, newline, space0, space1},
+    character::complete::{self, newline, space0},
     combinator::{map, value},
     multi::many1,
     sequence::{preceded, terminated, tuple},
