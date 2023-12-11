@@ -35,79 +35,49 @@ fn parse_input(input: &str) -> Input {
 }
 
 fn manhattan_distance(a: &(i64, i64), b: &(i64, i64)) -> i64 {
-    ((a.1 as i32 - b.1 as i32).abs() + (a.0 as i32 - b.0 as i32).abs()) as i64
+    (a.1 - b.1).abs() + (a.0 - b.0).abs()
+}
+
+fn solve(input: &str, factor: i64) -> i64 {
+    let input = parse_input(input);
+
+    let mut cols_to_expand: HashSet<i64> = (0..input.cols).collect();
+    let mut rows_to_expand: HashSet<i64> = (0..input.rows).collect();
+
+    input.galaxies.iter().for_each(|g| {
+        rows_to_expand.remove(&g.0);
+        cols_to_expand.remove(&g.1);
+    });
+
+    let expanded_galaxies: HashSet<(i64, i64)> = input
+        .galaxies
+        .iter()
+        .map(|(row, col)| {
+            let rows_expanded_before = rows_to_expand.iter().filter(|rn| *rn < row).count() as i64;
+            let cols_expanded_before = cols_to_expand.iter().filter(|cn| *cn < col).count() as i64;
+
+            (
+                row + (rows_expanded_before * factor) - rows_expanded_before,
+                col + (cols_expanded_before * factor) - cols_expanded_before,
+            )
+        })
+        .collect();
+
+    expanded_galaxies
+        .iter()
+        .tuple_combinations()
+        .map(|(a, b)| {
+            manhattan_distance(a, b)
+        })
+        .sum()
 }
 
 pub fn part_one(input: &str) -> Option<i64> {
-    let input = parse_input(input);
-
-    let mut cols_to_expand: HashSet<i64> = (0..input.cols).collect();
-    let mut rows_to_expand: HashSet<i64> = (0..input.rows).collect();
-
-    input.galaxies.iter().for_each(|g| {
-        rows_to_expand.remove(&g.0);
-        cols_to_expand.remove(&g.1);
-    });
-
-    let expanded_galaxies: HashSet<(i64, i64)> = input
-        .galaxies
-        .iter()
-        .map(|(row, col)| {
-            let rows_expanded_before = rows_to_expand.iter().filter(|rn| *rn < row).count() as i64;
-            let cols_expanded_before = cols_to_expand.iter().filter(|cn| *cn < col).count() as i64;
-
-            (
-                row + rows_expanded_before,
-                col + cols_expanded_before,
-            )
-        })
-        .collect();
-
-    let res: i64 = expanded_galaxies
-        .iter()
-        .tuple_combinations()
-        .map(|(a, b)| {
-            manhattan_distance(a, b)
-        })
-        .sum();
-
-    Some(res)
+    Some(solve(input, 2))
 }
 
 pub fn part_two(input: &str) -> Option<i64> {
-    let input = parse_input(input);
-
-    let mut cols_to_expand: HashSet<i64> = (0..input.cols).collect();
-    let mut rows_to_expand: HashSet<i64> = (0..input.rows).collect();
-
-    input.galaxies.iter().for_each(|g| {
-        rows_to_expand.remove(&g.0);
-        cols_to_expand.remove(&g.1);
-    });
-
-    let expanded_galaxies: HashSet<(i64, i64)> = input
-        .galaxies
-        .iter()
-        .map(|(row, col)| {
-            let rows_expanded_before = rows_to_expand.iter().filter(|rn| *rn < row).count() as i64;
-            let cols_expanded_before = cols_to_expand.iter().filter(|cn| *cn < col).count() as i64;
-
-            (
-                row + (rows_expanded_before * 1000000) - rows_expanded_before,
-                col + (cols_expanded_before * 1000000) - cols_expanded_before,
-            )
-        })
-        .collect();
-
-    let res: i64 = expanded_galaxies
-        .iter()
-        .tuple_combinations()
-        .map(|(a, b)| {
-            manhattan_distance(a, b)
-        })
-        .sum();
-
-    Some(res)
+    Some(solve(input, 1000000))
 }
 
 #[cfg(test)]
