@@ -74,7 +74,6 @@ struct Hand {
 }
 
 impl Hand {
-
     fn compute_hand_type(cards: &Vec<Card>) -> HandType {
         let mut groups = cards.into_iter().counts();
         let jokers = *groups.get(&Card::Joker).unwrap_or(&0);
@@ -179,5 +178,4 @@ mod tests {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
         assert_eq!(result, Some(5905));
     }
-
 }

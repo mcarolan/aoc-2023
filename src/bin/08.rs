@@ -88,7 +88,11 @@ pub fn part_one(input: &str) -> Option<u64> {
     Some(steps(&String::from("AAA"), &input.directions, &map))
 }
 
-fn steps(from: &String, directions: &Vec<Direction>, map: &HashMap<String, (String, String)>) -> u64 {
+fn steps(
+    from: &String,
+    directions: &Vec<Direction>,
+    map: &HashMap<String, (String, String)>,
+) -> u64 {
     let mut step = 0;
     let mut direction_index = 0;
 
@@ -113,9 +117,9 @@ pub fn part_two(input: &str) -> Option<u64> {
     let (_, input) = parse_input(input).unwrap();
     let map = build_map(&input.entries);
 
-    let starting = map.keys().filter(|k|k.ends_with("A"));
+    let starting = map.keys().filter(|k| k.ends_with("A"));
     let steps = starting.map(|from| steps(from, &input.directions, &map));
-    
+
     Some(steps.into_iter().fold(1, |acc, x| acc.lcm(&x)))
 }
 
@@ -125,13 +129,17 @@ mod tests {
 
     #[test]
     fn test_part_one() {
-        let result = part_one(&advent_of_code::template::read_file_part("examples", DAY, 1));
+        let result = part_one(&advent_of_code::template::read_file_part(
+            "examples", DAY, 1,
+        ));
         assert_eq!(result, Some(6));
     }
 
     #[test]
     fn test_part_two() {
-        let result = part_two(&advent_of_code::template::read_file_part("examples", DAY, 2));
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 2,
+        ));
         assert_eq!(result, Some(6));
     }
 }

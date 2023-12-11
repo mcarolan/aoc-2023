@@ -38,7 +38,6 @@ struct Pipe {
 #[derive(Debug)]
 struct Input {
     tiles: HashMap<(i32, i32), Pipe>,
-    ground: HashSet<(i32, i32)>,
     start: (i32, i32),
     width: i32,
     height: i32,
@@ -148,7 +147,6 @@ fn parse_input(input: &str) -> Input {
     let mut y = 0;
     let mut x = 0;
 
-    let mut ground: HashSet<(i32, i32)> = HashSet::new();
     let mut map: HashMap<(i32, i32), Pipe> = HashMap::new();
 
     for line in input.lines() {
@@ -156,10 +154,7 @@ fn parse_input(input: &str) -> Input {
         for char in line.chars() {
             match char {
                 'S' => start = Some((x, y)),
-                '.' => {
-                    ground.insert((x, y));
-                    ()
-                }
+                '.' => (),
                 _ => {
                     map.insert((x, y), parse_pipe(char));
                     ()
@@ -177,7 +172,6 @@ fn parse_input(input: &str) -> Input {
         tiles: map,
         height: y,
         width: x,
-        ground,
     }
 }
 
@@ -187,26 +181,29 @@ fn adjacent_pipes(start: (i32, i32), map: &HashMap<(i32, i32), Pipe>) -> Vec<Hea
     headings
         .into_iter()
         .filter(|h| {
-            map.get(&h.offset(&start)).is_some_and(|p| {
-                p.from == h.opposite() || p.to == h.opposite()
-            })
+            map.get(&h.offset(&start))
+                .is_some_and(|p| p.from == h.opposite() || p.to == h.opposite())
         })
         .collect()
+}
+
+fn place_start(start: (i32, i32), map: &HashMap<(i32, i32), Pipe>) -> HashMap<(i32, i32), Pipe> {
+    let mut map = map.clone();
+
+    let adjacent_headings = adjacent_pipes(start, &map);
+    let start_pipe = Pipe {
+        from: *adjacent_headings.get(0).unwrap(),
+        to: *adjacent_headings.get(1).unwrap(),
+    };
+    map.insert(start, start_pipe);
+
+    map
 }
 
 pub fn part_one(input: &str) -> Option<i32> {
     let input = parse_input(input);
 
-    let mut map = input.tiles.clone();
-
-    let adjacent_headings = adjacent_pipes(input.start, &map);
-    let start_pipe = Pipe {
-        from: *adjacent_headings.get(0).unwrap(),
-        to: *adjacent_headings.get(1).unwrap(),
-    };
-
-    map.insert(input.start, start_pipe);
-
+    let map = place_start(input.start, &input.tiles);
     furthest(input.start, &map)
 }
 
@@ -214,8 +211,8 @@ fn double_tuple(tup: &(i32, i32)) -> (i32, i32) {
     (2 * tup.0, 2 * tup.1)
 }
 
-fn double_res(tiles: &HashMap<(i32, i32), Pipe>) -> HashSet<(i32, i32)> {
-    let res: HashSet<(i32, i32)> = tiles
+fn double_res(longest_loop: &HashMap<(i32, i32), Pipe>) -> HashSet<(i32, i32)> {
+    longest_loop
         .iter()
         .flat_map(|(pos, pipe)| {
             vec![
@@ -224,9 +221,7 @@ fn double_res(tiles: &HashMap<(i32, i32), Pipe>) -> HashSet<(i32, i32)> {
                 pipe.to.offset(&double_tuple(pos)),
             ]
         })
-        .collect();
-
-    res
+        .collect()
 }
 
 fn clamp(pos: &(i32, i32), width: i32, height: i32) -> Option<(i32, i32)> {
@@ -240,14 +235,7 @@ fn clamp(pos: &(i32, i32), width: i32, height: i32) -> Option<(i32, i32)> {
 pub fn part_two(input: &str) -> Option<i32> {
     let input = parse_input(input);
 
-    let mut map = input.tiles.clone();
-    map.insert(
-        input.start,
-        Pipe {
-            from: Heading::South,
-            to: Heading::East,
-        },
-    );
+    let map = place_start(input.start, &input.tiles);
 
     let longest_loop = loop_path(input.start, &map);
     let path_points = double_res(&longest_loop);
@@ -306,13 +294,17 @@ mod tests {
 
     #[test]
     fn test_part_one() {
-        let result = part_one(&advent_of_code::template::read_file("examples", DAY));
+        let result = part_one(&advent_of_code::template::read_file_part(
+            "examples", DAY, 1,
+        ));
         assert_eq!(result, Some(4));
     }
 
     #[test]
     fn test_part_two() {
-        let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        let result = part_two(&advent_of_code::template::read_file_part(
+            "examples", DAY, 2,
+        ));
+        assert_eq!(result, Some(8));
     }
 }
