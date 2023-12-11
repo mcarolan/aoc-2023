@@ -1,12 +1,17 @@
 use itertools::Itertools;
-use nom::{character::complete::{space0, self, newline}, sequence::{preceded, terminated}, IResult, multi::many1, combinator::map};
+use nom::{
+    character::complete::{self, newline, space0},
+    combinator::map,
+    multi::many1,
+    sequence::{preceded, terminated},
+    IResult,
+};
 
 advent_of_code::solution!(9);
 
-
 #[derive(Debug)]
 struct Input {
-    entries: Vec<Vec<i32>>
+    entries: Vec<Vec<i32>>,
 }
 
 fn parse_spaced_number(input: &str) -> IResult<&str, i32> {
@@ -16,7 +21,7 @@ fn parse_spaced_number(input: &str) -> IResult<&str, i32> {
 fn parse_input(input: &str) -> IResult<&str, Input> {
     let parse_entry = terminated(many1(parse_spaced_number), newline);
     let entries = many1(parse_entry);
-    map(entries, |entries| Input { entries})(input)
+    map(entries, |entries| Input { entries })(input)
 }
 
 fn diffs(input: &Vec<i32>) -> Vec<i32> {
@@ -24,15 +29,15 @@ fn diffs(input: &Vec<i32>) -> Vec<i32> {
 }
 
 fn build_diffs(readings: &Vec<i32>) -> Vec<Vec<i32>> {
-    let mut res = vec![ readings.clone() ];
+    let mut res = vec![readings.clone()];
 
     loop {
-        let last =  res.last().unwrap();
+        let last = res.last().unwrap();
         let next = diffs(last);
 
         if next.iter().all(|n| *n == 0) {
             break;
-        } 
+        }
         res.push(next.clone());
     }
     res
@@ -69,8 +74,13 @@ pub fn part_two(input: &str) -> Option<i32> {
     let (_, input) = parse_input(input).unwrap();
 
     predict_part_2(build_diffs(input.entries.get(2).unwrap()));
-    
-    let res = Vec::from_iter(input.entries.into_iter().map(|e| predict_part_2(build_diffs(&e))));
+
+    let res = Vec::from_iter(
+        input
+            .entries
+            .into_iter()
+            .map(|e| predict_part_2(build_diffs(&e))),
+    );
 
     Some(res.iter().sum())
 }
