@@ -186,7 +186,11 @@ fn adjacent_pipes(start: (i32, i32), map: &HashMap<(i32, i32), Pipe>) -> Vec<Hea
 
     headings
         .into_iter()
-        .filter(|h| map.contains_key(&h.offset(&start)))
+        .filter(|h| {
+            map.get(&h.offset(&start)).is_some_and(|p| {
+                p.from == h.opposite() || p.to == h.opposite()
+            })
+        })
         .collect()
 }
 
@@ -196,13 +200,12 @@ pub fn part_one(input: &str) -> Option<i32> {
     let mut map = input.tiles.clone();
 
     let adjacent_headings = adjacent_pipes(input.start, &map);
-    map.insert(
-        input.start,
-        Pipe {
-            from: *adjacent_headings.get(0).unwrap(),
-            to: *adjacent_headings.get(1).unwrap(),
-        }
-    );
+    let start_pipe = Pipe {
+        from: *adjacent_headings.get(0).unwrap(),
+        to: *adjacent_headings.get(1).unwrap(),
+    };
+
+    map.insert(input.start, start_pipe);
 
     furthest(input.start, &map)
 }
