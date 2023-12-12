@@ -1,5 +1,9 @@
-use std::{collections::VecDeque, ops::Index};
+use std::{
+    collections::VecDeque,
+    ops::{Deref, Index},
+};
 
+use itertools::Itertools;
 use nom::{
     branch::alt,
     character::complete::{self, newline, space1},
@@ -8,6 +12,7 @@ use nom::{
     sequence::separated_pair,
     IResult,
 };
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 advent_of_code::solution!(12);
 
@@ -55,6 +60,8 @@ fn combinations(assignments: &Vec<Option<bool>>) -> Vec<Vec<bool>> {
         }
     }
 
+    println!("{} combos produced", result.len());
+
     result
 }
 
@@ -90,18 +97,108 @@ pub fn part_one(input: &str) -> Option<u32> {
 
     Some(
         rows.iter()
+            .map(|r| solutions(&r.assignments, None, &r.runs))
+            .sum(),
+    )
+}
+
+fn solutions(assignment: &Vec<Option<bool>>, run: Option<u32>, remain: &Vec<u32>) -> u32 {
+    if assignment.is_empty() {
+        if run == None && remain.len() == 0 {
+            return 1;
+        }
+
+        if remain.len() == 1 && run.is_some_and(|n| n == *remain.first().unwrap()) {
+            return 1;
+        }
+
+        return 0;
+    }
+    
+    let possible_more = assignment
+        .iter()
+        .filter(|a| **a == None || **a == Some(true))
+        .count() as u32;
+
+    if run.is_some_and(|n| n + possible_more < remain.iter().sum()) {
+        return 0;
+    }
+    
+    if run.is_none() && possible_more < remain.iter().sum() {
+        return 0;
+    }
+
+    if run.is_some() && remain.is_empty() {
+        return 0;
+    }
+
+    let head = *assignment.first().unwrap();
+    let mut res = 0;
+    
+    if head == Some(false) && run.is_some_and(|n| n != *remain.first().unwrap()) {
+        return 0;
+    }
+    
+    if head == Some(false) && run.is_some() {
+        res += solutions(&assignment[1..].to_vec(), None, &remain[1..].to_vec())
+    }
+    
+    if head == None && run.is_some_and(|n| n == *remain.first().unwrap()) {
+        res += solutions(&assignment[1..].to_vec(), None, &remain[1..].to_vec())
+    }
+    
+    if (head == None || head == Some(true)) && run.is_some() {
+        res += solutions(&assignment[1..].to_vec(), run.map(|n|n+1), remain);
+    }
+    
+    if (head == None || head ==Some(true)) && run.is_none() {
+        res += solutions(&assignment[1..].to_vec(), Some(1), remain)
+    }
+    
+    if (head == None || head ==Some(false)) && run.is_none() {
+        res += solutions(&assignment[1..].to_vec(), None, remain)
+    }
+
+    res
+}
+
+pub fn part_two(input: &str) -> Option<u32> {
+    let (_, rows) = separated_list1(newline, parse_row)(input).unwrap();
+
+    let expanded_rows: Vec<Row> = rows
+        .iter()
+        .map(|r| {
+            let mut assignments: Vec<Option<bool>> = Vec::new();
+            let mut is_first = true;
+
+            for _ in 0..5 {
+                if !is_first {
+                    assignments.push(None);
+                } else {
+                    is_first = false;
+                }
+
+                assignments.extend(r.assignments.iter());
+            }
+
+            Row {
+                assignments,
+                runs: r.runs.repeat(5),
+            }
+        })
+        .collect();
+
+    Some(
+        expanded_rows
+            .par_iter()
             .map(|r| {
                 combinations(&r.assignments)
-                    .iter()
+                    .par_iter()
                     .filter(|a| is_valid(a, &r.runs))
                     .count() as u32
             })
             .sum(),
     )
-}
-
-pub fn part_two(input: &str) -> Option<u32> {
-    None
 }
 
 #[cfg(test)]
@@ -117,6 +214,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(525152));
     }
 }
