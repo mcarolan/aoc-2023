@@ -1,9 +1,5 @@
-use std::{
-    collections::VecDeque,
-    ops::{Deref, Index},
-};
+use std::collections::HashMap;
 
-use itertools::Itertools;
 use nom::{
     branch::alt,
     character::complete::{self, newline, space1},
@@ -12,14 +8,13 @@ use nom::{
     sequence::separated_pair,
     IResult,
 };
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 advent_of_code::solution!(12);
 
 #[derive(Debug)]
 struct Row {
     assignments: Vec<Option<bool>>,
-    runs: Vec<u32>,
+    runs: Vec<u64>,
 }
 
 fn parse_assignment(input: &str) -> IResult<&str, Option<bool>> {
@@ -34,75 +29,27 @@ fn parse_row(input: &str) -> IResult<&str, Row> {
     let parts = separated_pair(
         many1(parse_assignment),
         space1,
-        separated_list1(complete::char(','), complete::u32),
+        separated_list1(complete::char(','), complete::u64),
     );
     map(parts, |(assignments, runs)| Row { assignments, runs })(input)
 }
 
-fn combinations(assignments: &Vec<Option<bool>>) -> Vec<Vec<bool>> {
-    let mut result: Vec<Vec<bool>> = Vec::new();
-    let mut q: Vec<Vec<Option<bool>>> = vec![assignments.clone()];
-
-    while let Some(assignment) = q.pop() {
-        let unassigned = assignment.iter().enumerate().find(|(_, o)| o.is_none());
-
-        match unassigned {
-            Some((i, _)) => {
-                let mut truey: Vec<Option<bool>> = assignment.clone();
-                truey[i] = Some(true);
-                q.push(truey);
-
-                let mut falsey: Vec<Option<bool>> = assignment.clone();
-                falsey[i] = Some(false);
-                q.push(falsey);
-            }
-            None => result.push(assignment.iter().map(|o| o.unwrap()).collect()),
-        }
-    }
-
-    println!("{} combos produced", result.len());
-
-    result
-}
-
-fn is_valid(assignment: &Vec<bool>, runs: &Vec<u32>) -> bool {
-    let mut runs_remaining: VecDeque<u32> = VecDeque::new();
-    runs_remaining.extend(runs);
-    let mut current_run: Option<u32> = None;
-
-    for b in assignment {
-        if *b && current_run.is_some() {
-            current_run = current_run.map(|c| c + 1);
-        } else if *b && current_run.is_none() {
-            current_run = Some(1)
-        } else if !*b && current_run.is_some() {
-            let run_achieved = current_run.unwrap_or_default();
-            current_run = None;
-
-            let expected = runs_remaining.pop_front();
-            match expected {
-                Some(v) if v != run_achieved => return false,
-                Some(_) => (),
-                None => return false,
-            }
-        }
-    }
-
-    (current_run.is_none() && runs_remaining.is_empty())
-        || (runs_remaining.len() == 1 && runs_remaining.pop_front() == current_run)
-}
-
-pub fn part_one(input: &str) -> Option<u32> {
+pub fn part_one(input: &str) -> Option<u64> {
     let (_, rows) = separated_list1(newline, parse_row)(input).unwrap();
+    let mut cache: HashMap<(Vec<Option<bool>>, Option<u64>, Vec<u64>), u64> = HashMap::new();
 
     Some(
         rows.iter()
-            .map(|r| solutions(&r.assignments, None, &r.runs))
+            .map(|r| solutions(&mut cache, &r.assignments, None, &r.runs))
             .sum(),
     )
 }
 
-fn solutions(assignment: &Vec<Option<bool>>, run: Option<u32>, remain: &Vec<u32>) -> u32 {
+fn solutions(cache: &mut HashMap<(Vec<Option<bool>>, Option<u64>, Vec<u64>), u64>, assignment: &Vec<Option<bool>>, run: Option<u64>, remain: &Vec<u64>) -> u64 {
+    if let Some(res) = cache.get(&(assignment.clone(), run, remain.clone())) {
+        return *res;
+    }
+    
     if assignment.is_empty() {
         if run == None && remain.len() == 0 {
             return 1;
@@ -114,16 +61,16 @@ fn solutions(assignment: &Vec<Option<bool>>, run: Option<u32>, remain: &Vec<u32>
 
         return 0;
     }
-    
+
     let possible_more = assignment
         .iter()
         .filter(|a| **a == None || **a == Some(true))
-        .count() as u32;
+        .count() as u64;
 
     if run.is_some_and(|n| n + possible_more < remain.iter().sum()) {
         return 0;
     }
-    
+
     if run.is_none() && possible_more < remain.iter().sum() {
         return 0;
     }
@@ -134,35 +81,36 @@ fn solutions(assignment: &Vec<Option<bool>>, run: Option<u32>, remain: &Vec<u32>
 
     let head = *assignment.first().unwrap();
     let mut res = 0;
-    
+
     if head == Some(false) && run.is_some_and(|n| n != *remain.first().unwrap()) {
         return 0;
     }
-    
+
     if head == Some(false) && run.is_some() {
-        res += solutions(&assignment[1..].to_vec(), None, &remain[1..].to_vec())
-    }
-    
-    if head == None && run.is_some_and(|n| n == *remain.first().unwrap()) {
-        res += solutions(&assignment[1..].to_vec(), None, &remain[1..].to_vec())
-    }
-    
-    if (head == None || head == Some(true)) && run.is_some() {
-        res += solutions(&assignment[1..].to_vec(), run.map(|n|n+1), remain);
-    }
-    
-    if (head == None || head ==Some(true)) && run.is_none() {
-        res += solutions(&assignment[1..].to_vec(), Some(1), remain)
-    }
-    
-    if (head == None || head ==Some(false)) && run.is_none() {
-        res += solutions(&assignment[1..].to_vec(), None, remain)
+        res += solutions(cache, &assignment[1..].to_vec(), None, &remain[1..].to_vec())
     }
 
+    if head == None && run.is_some_and(|n| n == *remain.first().unwrap()) {
+        res += solutions(cache, &assignment[1..].to_vec(), None, &remain[1..].to_vec())
+    }
+
+    if (head == None || head == Some(true)) && run.is_some() {
+        res += solutions(cache,&assignment[1..].to_vec(), run.map(|n| n + 1), remain);
+    }
+
+    if (head == None || head == Some(true)) && run.is_none() {
+        res += solutions(cache, &assignment[1..].to_vec(), Some(1), remain)
+    }
+
+    if (head == None || head == Some(false)) && run.is_none() {
+        res += solutions(cache,&assignment[1..].to_vec(), None, remain)
+    }
+
+    cache.insert((assignment.clone(), run, remain.clone()), res);
     res
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
+pub fn part_two(input: &str) -> Option<u64> {
     let (_, rows) = separated_list1(newline, parse_row)(input).unwrap();
 
     let expanded_rows: Vec<Row> = rows
@@ -188,15 +136,11 @@ pub fn part_two(input: &str) -> Option<u32> {
         })
         .collect();
 
+    let mut cache: HashMap<(Vec<Option<bool>>, Option<u64>, Vec<u64>), u64> = HashMap::new();
+
     Some(
-        expanded_rows
-            .par_iter()
-            .map(|r| {
-                combinations(&r.assignments)
-                    .par_iter()
-                    .filter(|a| is_valid(a, &r.runs))
-                    .count() as u32
-            })
+        expanded_rows.iter()
+            .map(|r| solutions(&mut cache, &r.assignments, None, &r.runs))
             .sum(),
     )
 }
