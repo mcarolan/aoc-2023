@@ -64,16 +64,39 @@ impl std::fmt::Display for Pattern {
 
 fn is_row_reflection(pattern: &Pattern, point: u32) -> bool {
     let mut l = point as i32 - 1;
-    let mut r  = point;
+    let mut r = point;
 
     while l >= 0 && r < pattern.rows.len() as u32 {
         if pattern.rows.get(l as usize) != pattern.rows.get(r as usize) {
-            return false
+            return false;
         }
         l -= 1;
         r += 1;
     }
     true
+}
+
+fn is_row_reflection2(pattern: &Pattern, point: u32) -> bool {
+    let mut l = point as i32 - 1;
+    let mut r = point;
+
+    let mut diffs = 0;
+
+    while l >= 0 && r < pattern.rows.len() as u32 {
+        if diffs > 1 {
+            break
+        }
+
+        let r1 = pattern.rows.get(l as usize).unwrap();
+        let r2 = pattern.rows.get(r as usize).unwrap();
+
+        diffs += r1.iter().zip(r2).filter(|(a, b)| a != b).count();
+
+        l -= 1;
+        r += 1;
+    }
+
+    diffs == 1
 }
 
 fn parse_pattern(input: &str) -> IResult<&str, Pattern> {
@@ -113,7 +136,7 @@ pub fn part_one(input: &str) -> Option<u32> {
 
         let tp = pattern.transpose();
 
-        for p in  1..tp.rows.len() {
+        for p in 1..tp.rows.len() {
             let p = p as u32;
             if is_row_reflection(&tp, p) {
                 result += p;
@@ -126,7 +149,31 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let (_, input) = parse_input(input).unwrap();
+
+    let mut result: u32 = 0;
+
+    for pattern in input.patterns.iter() {
+        for p in 1..pattern.rows.len() {
+            let p = p as u32;
+            if is_row_reflection2(&pattern, p) {
+                result += p * 100;
+                break;
+            }
+        }
+
+        let tp = pattern.transpose();
+
+        for p in 1..tp.rows.len() {
+            let p = p as u32;
+            if is_row_reflection2(&tp, p) {
+                result += p;
+                break;
+            }
+        }
+    }
+
+    Some(result)
 }
 
 #[cfg(test)]
@@ -142,6 +189,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(400));
     }
 }
