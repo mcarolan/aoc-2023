@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, arch::x86_64::_SIDD_NEGATIVE_POLARITY};
 
 advent_of_code::solution!(14);
 
@@ -31,7 +31,7 @@ impl std::fmt::Display for Input {
 }
 
 impl Input {
-    fn tilt_north(&self) -> Input {
+    fn tilt(&self) -> Input {
         let mut round_rocks: HashMap<u64, HashSet<u64>> = HashMap::new();
 
         for row in 0..self.rows {
@@ -47,6 +47,31 @@ impl Input {
         }
         
         Input { round_rocks, square_rocks: self.square_rocks.clone(), cols: self.cols, rows: self.rows }
+    }
+
+    fn rotate(&self) -> Input {
+        let mut square_rocks: HashMap<u64, HashSet<u64>> = HashMap::new();
+        let mut round_rocks: HashMap<u64, HashSet<u64>> = HashMap::new();
+
+        for col in 0..self.cols {
+            square_rocks.insert(col, HashSet::new());
+            round_rocks.insert(col, HashSet::new());
+        }
+
+        for row in 0..self.rows {
+            for col in self.round_rocks.get(&row).unwrap() {
+                round_rocks.get_mut(col).unwrap().insert(&self.rows - 1 -row);
+            }
+            for col in self.square_rocks.get(&row).unwrap() {
+                square_rocks.get_mut(col).unwrap().insert(&self.rows - 1 -row);
+            }
+        }
+
+        Input { round_rocks, square_rocks, cols: self.rows, rows: self.cols }
+    }
+
+    fn cycle(&self) -> Input {
+        self.tilt().rotate().tilt().rotate().tilt().rotate().tilt().rotate()
     }
 }
 
@@ -90,7 +115,7 @@ fn parse_input(input: &str) -> Input {
 
 pub fn part_one(input: &str) -> Option<u64> {
     let input = parse_input(input);
-    let north = input.tilt_north();
+    let north = input.tilt();
 
     Some((0..north.rows).map(|r| {
         let row = north.round_rocks.get(&r).unwrap();
@@ -98,8 +123,20 @@ pub fn part_one(input: &str) -> Option<u64> {
     }).sum())
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    let mut input = parse_input(input);
+
+    let mut cache: HashMap<Input, Input> = HashMap::new();
+
+    for _ in 0..1000000000 {
+        if cache.
+        input = input.cycle();
+    }
+
+    Some((0..input.rows).map(|r| {
+        let row = input.round_rocks.get(&r).unwrap();
+        row.len() as u64 * (input.rows - r)
+    }).sum())
 }
 
 #[cfg(test)]
@@ -115,6 +152,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(64));
     }
 }
