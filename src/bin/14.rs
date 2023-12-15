@@ -1,4 +1,6 @@
-use std::{collections::{HashMap, HashSet}, arch::x86_64::_SIDD_NEGATIVE_POLARITY};
+use std::collections::{HashMap, HashSet};
+
+use itertools::Itertools;
 
 advent_of_code::solution!(14);
 
@@ -123,13 +125,36 @@ pub fn part_one(input: &str) -> Option<u64> {
     }).sum())
 }
 
+fn map_key(m: HashMap<u64, HashSet<u64>>) -> Vec<(u64, Vec<u64>)> {
+    let mut res = m.into_iter().map(|(k, v)| {
+        let mut v : Vec<u64> =  v.into_iter().collect();
+        v.sort();
+        (k, v)
+    }).collect_vec();
+    res.sort();
+    res
+}
+
 pub fn part_two(input: &str) -> Option<u64> {
     let mut input = parse_input(input);
 
-    let mut cache: HashMap<Input, Input> = HashMap::new();
+    let mut cache: HashMap<Vec<(u64, Vec<u64>)>, i32> = HashMap::new();
 
-    for _ in 0..1000000000 {
-        if cache.
+    cache.insert(map_key(input.round_rocks.clone()), 0);
+    let mut remaining = 0;
+
+    for i in 1..1000000000 {
+        input = input.cycle();
+        let key = map_key(input.round_rocks.clone());
+
+        if let Some(j) = cache.get(&key) {
+            remaining = (1000000000 - i) % (i - j);
+            break;
+        }
+        cache.insert(key, i);
+    }
+
+    for _ in 0..remaining {
         input = input.cycle();
     }
 
