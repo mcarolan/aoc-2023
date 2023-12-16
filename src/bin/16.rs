@@ -127,13 +127,8 @@ impl Beam {
     }
 }
 
-pub fn part_one(input: &str) -> Option<i64> {
-    let (grid, _rows, _cols) = parse_input(input);
-
-    let mut beams = vec![Beam {
-        pos: (0, 0),
-        direction: Direction::Right
-    }];
+fn solve(grid: &HashMap<(i64, i64), char>, initial_beam: Beam) -> i64 {
+    let mut beams = vec![initial_beam];
     let mut energised: HashSet<(i64, i64)> = HashSet::new();
     let mut visited: HashSet<((i64, i64), Direction)> = HashSet::new();
 
@@ -173,11 +168,40 @@ pub fn part_one(input: &str) -> Option<i64> {
         beams.extend(add_list);
     }
 
-    Some(energised.len() as i64)
+    energised.len() as i64
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+pub fn part_one(input: &str) -> Option<i64> {
+    let (grid, _rows, _cols) = parse_input(input);
+
+    Some(solve(&grid, Beam { pos: (0, 0), direction: Direction::Right }))
+}
+
+pub fn part_two(input: &str) -> Option<i64> {
+    let (grid, rows, cols) = parse_input(input);
+    let mut res = 0;
+
+    res = res.max(solve(&grid, Beam { pos: (0, 0), direction: Direction::Down }));
+    res = res.max(solve(&grid, Beam { pos: (0, 0), direction: Direction::Right }));
+    res = res.max(solve(&grid, Beam { pos: (0, cols - 1), direction: Direction::Down }));
+    res = res.max(solve(&grid, Beam { pos: (0, cols - 1), direction: Direction::Left }));
+
+    res = res.max(solve(&grid, Beam { pos: (rows - 1, 0), direction: Direction::Up }));
+    res = res.max(solve(&grid, Beam { pos: (rows - 1, 0), direction: Direction::Right }));
+    res = res.max(solve(&grid, Beam { pos: (rows - 1, cols - 1), direction: Direction::Up }));
+    res = res.max(solve(&grid, Beam { pos: (rows - 1, cols - 1), direction: Direction::Left }));
+
+    for x in 1..cols {
+        res = res.max(solve(&grid, Beam { pos: (0, x), direction: Direction::Down }));
+        res = res.max(solve(&grid, Beam { pos: (rows - 1, x), direction: Direction::Up }));
+    }
+
+    for y in 1..rows {
+        res = res.max(solve(&grid, Beam { pos: (y, 0), direction: Direction::Right }));
+        res = res.max(solve(&grid, Beam { pos: (y, cols - 1), direction: Direction::Left }));
+    }
+
+    Some(res)
 }
 
 #[cfg(test)]
@@ -193,6 +217,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(51));
     }
 }
