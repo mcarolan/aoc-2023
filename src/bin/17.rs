@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use itertools::Itertools;
 use pathfinding::directed::dijkstra::{dijkstra, dijkstra_all};
@@ -152,10 +152,9 @@ pub fn part_two(input: &str) -> Option<u32> {
 
     let start: ((i64, i64), Option<Direction>, u32) = ((0, 0), None, 0);
 
-    dijkstra(&start, neighbours2(&input), |((pos), _, _)| {
-        *pos == (rows - 1, cols - 1)
-    })
-    .map(|(_, c)| c as u32)
+    dijkstra(&start, neighbours2(&input), |((pos), _, steps)| {
+        *pos == (rows - 1, cols - 1) && *steps >= 3
+    }).map(|(_, c)| c as u32)
 }
 
 #[cfg(test)]
@@ -172,5 +171,11 @@ mod tests {
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
         assert_eq!(result, Some(94));
+    }
+
+    #[test]
+    fn test_example_2() {
+        let result = part_two(&advent_of_code::template::read_file_part("examples", DAY, 2));
+        assert_eq!(result, Some(71));
     }
 }
