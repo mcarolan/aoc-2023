@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use itertools::Itertools;
 
 advent_of_code::solution!(18);
@@ -10,17 +8,6 @@ enum Direction {
     Down,
     Left,
     Right,
-}
-
-impl Direction {
-    fn offset(&self, pos: (i64, i64)) -> (i64, i64) {
-        match self {
-            Direction::Up => (pos.0 - 1, pos.1),
-            Direction::Down => (pos.0 + 1, pos.1),
-            Direction::Left => (pos.0, pos.1 - 1),
-            Direction::Right => (pos.0, pos.1 + 1),
-        }
-    }
 }
 
 fn parse_direction(input: &str) -> Direction {
@@ -52,79 +39,77 @@ fn parse_input(input: &str) -> Vec<(Direction, u64)> {
     res
 }
 
-fn draw(grid: &HashSet<(i64, i64)>) {
-    let rows_min = *grid.into_iter().map(|(r, _)| r).min().unwrap();
-    let cols_min = *grid.into_iter().map(|(_, c)| c).min().unwrap();
+fn parse_input2(input: &str) -> Vec<(Direction, u64)> {
+    let mut res: Vec<(Direction, u64)> = Vec::new();
 
-    let rows_max = *grid.into_iter().map(|(r, _)| r).max().unwrap();
-    let cols_max = *grid.into_iter().map(|(_, c)| c).max().unwrap();
-
-    for r in rows_min..=rows_max {
-        for c in cols_min..=cols_max {
-            if grid.contains(&(r, c)) {
-                print!("#");
-            } else {
-                print!(".");
-            }
-        }
-        println!();
-    }
-}
-
-fn neighbours(pos: (i64, i64)) -> Vec<(i64, i64)> {
-    vec![
-        Direction::Up.offset(pos),
-        Direction::Down.offset(pos),
-        Direction::Left.offset(pos),
-        Direction::Right.offset(pos),
-    ]
-}
-
-pub fn part_one(input: &str) -> Option<u32> {
-    let input = parse_input(input);
-    let mut grid: HashSet<(i64, i64)> = HashSet::new();
-
-    let mut current_pos: (i64, i64) = (0, 0);
-
-    for (direction, distance) in input.iter() {
-        for _ in 0..*distance {
-            current_pos = direction.offset(current_pos);
-            grid.insert(current_pos);
-        }
-    }
-    let mut q: Vec<(i64, i64)> = Vec::new();
-
-    current_pos = (0, 0);
-    for (direction, distance) in input.iter() {
-        let right_of = match direction {
-            Direction::Up => Direction::Right,
-            Direction::Down => Direction::Left,
-            Direction::Left => Direction::Up,
-            Direction::Right => Direction::Down,
-        };
-
-        for _ in 0..*distance {
-            current_pos = direction.offset(current_pos);
-            q.push(right_of.offset(current_pos));
-        }
-    }
-
-    while let Some(pos) = q.pop() {
-        if grid.contains(&pos) {
+    for line in input.lines() {
+        let line = line.trim();
+        if line.is_empty() {
             continue;
         }
 
-        grid.insert(pos);
-        for neighbour in neighbours(pos) {
-            q.push(neighbour);
-        }
+        let parts = line.split_ascii_whitespace().collect_vec();
+        let hex = parts.get(2).unwrap().replace("(#", "").replace(")", "");
+
+        let distance: u64 = u64::from_str_radix(hex.chars().take(5).collect::<String>().as_str(), 16).unwrap();
+
+        let direction = match hex.chars().last() {
+            Some('0') => Direction::Right,
+            Some('1') => Direction::Down,
+            Some('2') => Direction::Left,
+            Some('3') => Direction::Up,
+            _ => todo!(),
+        };
+        
+        res.push((direction, distance));
     }
-    
-    Some(grid.len() as u32)
+
+    res
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+fn vertices(instructions: &Vec<(Direction, u64)>) -> Vec<(i64, i64)> {
+    let mut res = Vec::new();
+    
+    let mut current_pos: (i64, i64) = (0, 0);
+    
+    for (direction, distance) in instructions.iter() {
+        let distance = *distance as i64;
+        current_pos = match direction {
+            Direction::Up => (current_pos.0 - distance, current_pos.1),
+            Direction::Down => (current_pos.0 + distance, current_pos.1),
+            Direction::Left => (current_pos.0, current_pos.1 - distance),
+            Direction::Right => (current_pos.0, current_pos.1 + distance),
+        };
+        res.push(current_pos);
+    }
+    res
+}
+
+fn solve(instructions: &Vec<(Direction, u64)>) -> i64 {
+    let vertices = vertices(&instructions);
+    let vertex_count = vertices.len();
+
+    let n: i64 = vertices.iter().enumerate().map(|(i, (row, col))| {
+        let next_index = if i == vertex_count - 1 { 0 } else { i + 1 };
+        let next = vertices.get(next_index).unwrap();
+
+        (*col * next.0) - (next.1 * row) 
+    }).sum();
+
+    let perimeter: i64 = instructions.iter().map(|(_, d)| *d as i64).sum();
+
+
+    (n.abs() / 2) + (perimeter / 2 + 1)
+}
+
+pub fn part_one(input: &str) -> Option<i64> {
+    let input = parse_input(input);
+    Some(solve(&input))
+}
+
+pub fn part_two(input: &str) -> Option<i64> {
+    let input = parse_input2(input);
+    Some(solve(&input))
 }
 
 #[cfg(test)]
@@ -140,6 +125,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(952408144115));
     }
 }
