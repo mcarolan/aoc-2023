@@ -1,59 +1,46 @@
 use std::collections::{HashSet, HashMap};
 
 use itertools::Itertools;
+use priority_queue::PriorityQueue;
 
 
 advent_of_code::solution!(25);
 
+#[derive(Clone)]
 struct Graph<'a> {
     nodes: HashSet<&'a str>,
     edges: HashMap<&'a str, HashMap<&'a str, i32>>
 }
 
 impl<'a> Graph<'a> {
-    fn compact(&self, phase: &MinimumCutPhase) -> Graph<'a> {
-        let mut edges = self.edges.clone();
-        let mut nodes = self.nodes.clone();
 
-        if let Some(s_edges) = edges.get_mut(phase.s) {
-            for (to, weight) in self.edges.get(phase.t).unwrap() {
-                let existing = s_edges.get(to).unwrap_or(&0);
-                s_edges.insert(to, *existing + *weight);
-            }
-        }
-     
-        nodes.remove(phase.t);
-
-        Graph { nodes, edges }
+    fn new() -> Graph<'a> {
+        Graph { nodes: HashSet::new(), edges: HashMap::new() }
     }
 
-    fn from_phases(phases: &'a Vec<&MinimumCutPhase>) -> Graph<'a> {
-        let mut nodes: HashSet<&str> = HashSet::new();
-        let mut edges: HashMap<&str, HashMap<&str, i32>> = HashMap::new();
-
-        for phase in phases.iter() {
-            nodes.insert(phase.s);
-            nodes.insert(phase.t);
-
-            if !edges.contains_key(phase.s) {
-                edges.insert(phase.s, HashMap::new());
-            }
-            if !edges.contains_key(phase.t) {
-                edges.insert(phase.t, HashMap::new());
-            }
-
-            if let Some(s_edges) = edges.get_mut(phase.s) {
-                s_edges.insert(phase.t, phase.w);
-            }
-            if let Some(t_edges) = edges.get_mut(phase.t) {
-                t_edges.insert(phase.t, phase.w);
-            }
-        }
-        
-        Graph { nodes, edges } 
+    fn add_edge(&mut self, a: &'a str, b: &'a str, w: i32) {
+        self.nodes.insert(a);
+        self.nodes.insert(b);
+        self.edges.entry(a).or_insert(HashMap::new()).insert(b, w);
+        self.edges.entry(b).or_insert(HashMap::new()).insert(a, w);
     }
 
-    fn bfs(&'a self, from: &'a str) -> HashSet<&'a str> {
+    fn remove(&mut self, v: &'a str) {
+        self.nodes.remove(v);
+        self.edges.remove(v);
+        self.edges.iter_mut().for_each(|(_, n)| { n.remove(v); });
+    }
+
+    fn update_edge(&mut self, a: &'a str, b: &'a str, w: i32) {
+        *self.edges.entry(a).or_default().entry(b).or_insert(0) += w;
+        *self.edges.entry(b).or_default().entry(a).or_insert(0) += w;
+    }
+
+    fn get_neighbours(&self, n: &'a str) -> Vec<(&'a str, i32)> {
+        self.edges.get(n).unwrap().iter().map(|(k, v)| (*k, *v)).collect_vec()
+    }
+
+    fn bfs(&self, from: &'a str) -> HashSet<&'a str> {
         let mut visited: HashSet<&str> = HashSet::new();
         let mut q: Vec<&str> = vec![from];
 
@@ -95,8 +82,8 @@ impl<'a> std::fmt::Debug for Graph<'a> {
 }
 
 fn parse_graph(input: &str) -> Graph {
-    let mut nodes = HashSet::new();
-    let mut edges = HashMap::new();
+    let mut graph = Graph::new();
+
     for line in input.lines() {
         let line = line.trim();
         if line.is_empty() {
@@ -107,96 +94,73 @@ fn parse_graph(input: &str) -> Graph {
 
         let source = parts.next().unwrap();
         let destinations = parts.next().unwrap();
-
-        nodes.insert(source);
         
         for destination in destinations.split_whitespace() {
-            nodes.insert(destination);
-
-            if !edges.contains_key(source) {
-                edges.insert(source, HashMap::new());
-            }
-            if !edges.contains_key(destination) {
-                edges.insert(destination, HashMap::new());
-            }
-
-            if let Some(s_edges) = edges.get_mut(source) {
-                s_edges.insert(destination, 1);
-            }
-            if let Some(d_edges) = edges.get_mut(destination) {
-                d_edges.insert(source, 1);
-            }
+            graph.add_edge(source, destination, 1);
         }
         
     }
-    Graph { nodes, edges }
+    
+    graph
 }
 
-#[derive(Debug, Clone)]
-struct MinimumCutPhase<'a> {
-    s: &'a str,
-    t: &'a str,
-    w: i32
-}
-
-fn minimum_cut_phase<'a>(graph: &Graph<'a>) -> MinimumCutPhase<'a> {
-    let start = **graph.nodes.iter().collect_vec().first().unwrap();
-
-    let mut a: HashSet<&str> = HashSet::from_iter(vec![start]);
-    let mut remaining: HashSet<&str> = graph.nodes.clone();
-    remaining.remove(start);
-
-    let mut visit_order = vec![ start ];
-    let mut w = i32::MIN;
-
-    while !remaining.is_empty() {
-        let mut tightest: Option<&str> = None;
-        let mut tightest_weight = i32::MIN;
-
-        for node in remaining.iter() {
-            let mut tightness = 0;
-            for (destination, weight) in graph.edges.get(node).unwrap() {
-                if a.contains(destination) {
-                    tightness += weight;
-                }
-            }
-
-            if tightness > tightest_weight {
-                tightest_weight = tightness;
-                tightest = Some(node);
-            }
-        }
-
-        a.insert(tightest.unwrap());
-        remaining.remove(tightest.unwrap());
-        visit_order.push(tightest.unwrap());
-        w = tightest_weight;
+fn minimum_cut_phase<'a>(graph: &Graph<'a>) -> (&'a str, &'a str, i32) {
+    let mut q = PriorityQueue::new();
+    
+    for n in graph.nodes.iter() {
+        q.push(n, 0);
     }
-    let t = visit_order.pop().unwrap();
-    let s = visit_order.pop().unwrap();
 
-    MinimumCutPhase { s, t, w }
+    let mut s = "";
+    let mut t = "";
+    let mut w = 0;
+
+    while let Some((n, weight)) = q.pop() {
+        s = t;
+        t = n;
+        w = weight;
+
+        for (e, neighbour_weight) in graph.get_neighbours(n).iter() {
+            q.change_priority_by(e, |c| *c += neighbour_weight);
+        }
+    }
+    
+    (s, t, w)
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
     let input = parse_graph(input);
     let node_count = input.nodes.len();
 
-    let mut graph = input;
+    let mut graph = input.clone();
 
     let mut phases = Vec::new();
 
-    while graph.nodes.len() > 1 {
-        let phase = minimum_cut_phase(&graph);
-        phases.push(phase.clone());
-        graph = graph.compact(&phase.clone());
+    let mut best_phase = 0;
+    let mut best_cur_weight = i32::MAX;
+
+    for phase in 0..node_count-1 {
+        let (s, t, w) = minimum_cut_phase(&graph);
+        phases.push((s, t, w));
+        
+        if w < best_cur_weight {
+            best_cur_weight = w;
+            best_phase = phase;
+        }
+
+        for (n, w) in graph.get_neighbours(t) {
+            graph.update_edge(s, n, w);
+        }
+        graph.remove(t);
     }
 
-    let (i, min_phase) = phases.iter().enumerate().min_by_key(|(_, p)| p.w).unwrap();
-    let to_build_with = phases.iter().take(i + 1).collect_vec();
-    let rebuilt_graph = Graph::from_phases(&to_build_with);
+    let mut rebuilt_graph = Graph::new();
 
-    let p1 = rebuilt_graph.bfs(min_phase.s);
+    for (a, b, w) in phases.iter().take(best_phase) {
+        rebuilt_graph.add_edge(a, b, *w);
+    }
+
+    let p1 = rebuilt_graph.bfs(phases[best_phase].1);
 
     Some((p1.len() * (node_count - p1.len())) as u32)
 }
