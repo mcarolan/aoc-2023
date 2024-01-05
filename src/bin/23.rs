@@ -77,7 +77,7 @@ impl Map {
         panic!()
     }
 
-    fn neighbours(&self, point: Point) -> Vec<Point> {
+    fn neighbours(&self, point: Point, ignore_slope_direction: bool) -> Vec<Point> {
         let to_check = vec![
             (
                 Point {
@@ -117,7 +117,7 @@ impl Map {
                 } else if self.paths.contains(&p) {
                     Some(p)
                 } else if let Some(slope_direction) = self.slopes.get(&p) {
-                    if *slope_direction == direction { Some(p) } else { None }
+                    if ignore_slope_direction || *slope_direction == direction { Some(p) } else { None }
                 }
                 else {
                     None
@@ -175,7 +175,7 @@ pub fn part_one(input: &str) -> Option<u32> {
             continue;
         }
 
-        for to_visit in map.neighbours(point) {
+        for to_visit in map.neighbours(point, false) {
             if !visited.contains(&to_visit) {
                 let mut new_visited = visited.clone();
                 new_visited.insert(to_visit.clone());
@@ -188,7 +188,29 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let map = parse_map(input);
+    let start = map.find_start();
+
+    let mut q: Vec<(Point, HashSet<Point>)> = vec![(start.clone(), HashSet::from_iter(vec![start]))];
+
+    let mut longest_walk = 0;
+
+    while let Some((point, visited)) = q.pop() {
+        if point.row == map.rows - 1 {
+            longest_walk = longest_walk.max(visited.len() as u32 - 1);
+            continue;
+        }
+
+        for to_visit in map.neighbours(point, true) {
+            if !visited.contains(&to_visit) {
+                let mut new_visited = visited.clone();
+                new_visited.insert(to_visit.clone());
+                q.push((to_visit, new_visited))
+            }
+        }
+    }
+    
+    Some(longest_walk)
 }
 
 #[cfg(test)]
@@ -204,6 +226,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(154));
     }
 }
